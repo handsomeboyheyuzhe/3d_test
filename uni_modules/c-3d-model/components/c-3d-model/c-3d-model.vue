@@ -1,7 +1,7 @@
 <template>
 	<!-- #ifdef H5||APP-PLUS -->
 	<view class="c-3d-model"  :style="{width,height}"  :modelData="modelData" :change:modelData="three.init" :fun='fun'
-		:change:fun='three.callPlayer'>
+		:change:fun='three.callPlayer' :actions='actions' :change:actions='three.playAnimationTwo'>
 		<div :id='myCanvasId'></div>
 	</view>
 	<!-- #endif -->
@@ -105,7 +105,8 @@
 		emits: ['loaded'],
 		data() {
 			return {
-				fun: {}
+				fun: {},
+				actions:{},
 			}
 		},
 		computed: {
@@ -176,51 +177,13 @@
 					name,
 					args
 				}
-				// #ifdef MP
-				if (name == 'play' || name == 'stop') {
-					const length = animations.length
-					if (length == 0) {
-						console.error('模型文件中无剪辑动画');
-					} else if (args > length) {
-						console.error('模型文件中无该剪辑动画，动画组数：', length);
-					} else {
-						mixer.clipAction(animations[args])[name]()
-					}
+				
+			},
+			playActions(p1,p2){
+				this.actions={
+					p1:p1,
+					p2:p2
 				}
-				if(name=='dispose'){
-					if (model) this.deleteObject(model)
-					if(scene){
-						this.disposeScene(scene)
-						this.removeObjects(scene)
-					}
-					for (let i = scene.children.length - 1; i >= 0; i--) {
-					    scene.remove(scene.children[i]);
-					}
-					// let gl = renderer.domElement.getContext("webgl");
-					// gl && gl.getExtension("WEBGL_lose_context").loseContext();
-					THREE.PLATFORM.dispose();
-					scene.clear();
-					renderer.dispose();
-					renderer.forceContextLoss();
-					renderer.content = null;
-					THREEglobal.cancelAnimationFrame(this.animationID) // 去除animationFrame
-					
-					camera=null
-					scene=null
-					renderer=null
-					controls=null
-					clock=null 
-					mixer=null
-					animations=null
-					isReloadModel = false
-					model=null 
-					ambientLight=null 
-					THREEglobal=null
-					mycanvas=null
-					console.log('场景销毁');
-				}
-				// this.callPlayer(fun.value)
-				// #endif
 			},
 			playAnimation(i = 0) {
 				this.call('play', i)
@@ -479,7 +442,10 @@
 <!-- #ifndef MP -->
 
 <!-- #ifdef VUE3 -->
-<script src='./js/render.js' module="three" lang="renderjs"></script>
+<script src='./js/render.js' module="three" lang="renderjs">
+	
+</script>
+
 <!-- #endif -->
 
 <!-- #ifdef VUE2 -->

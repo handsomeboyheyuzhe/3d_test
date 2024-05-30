@@ -2,7 +2,7 @@
     <view>
         <c-3d-model ref="modelRef" :height="height" :src='src'
             :environmentSrc='environmentSrc' 
-            :decoderPath='decoderPath' :autoRotate='autoRotate'
+            :decoderPath='decoderPath' :autoRotate='autoRotate' :modelRotate='modelRotate' :modelPosition='modelPosition'
             :modelScale="modelScale" :ambientLight='0' @loaded='onLoaded'></c-3d-model>
          <view class="content">
             <view>区域渲染</view>
@@ -12,8 +12,14 @@
             </view>
             <view>动画控制</view>
             <view class="btnBox">
-                <button @click="$refs.modelRef.playAnimation(0)" size="mini">播放</button>
-                <button @click="$refs.modelRef.stopAnimation(0)" size="mini">停止</button>
+				<view class="btnBox">
+					<button @click="selectAction(0)">走</button>
+					<button @click="selectAction(1)">跑</button>
+					<button @click="selectAction(2)">趴</button>
+					<button @click="selectAction(3)">？？</button>
+				</view>
+                <button @click="$refs.modelRef.playAnimation(actionNumber)" size="mini">播放</button>
+                <button @click="$refs.modelRef.stopAnimation(actionNumber)" size="mini">停止</button>
             </view>
             <view>场景控制</view>
             <view class="btnBox">
@@ -22,7 +28,7 @@
             </view>
             <view>模型</view>
             <view class="btnBox">
-                <button @click="modelScale=[0.6,0.6,0.6],src='/static/model/blender.glb'" size="mini">盘子</button>
+                <button @click="modelScale=[0.1,0.1,0.1],src='/static/model/wolf.glb'" size="mini">盘子</button>
                 <!-- #ifdef MP -->
                 <!-- 小程序端暂不支持DRACO压缩模型-->
                 <button @click="modelScale=[0.2,0.2,0.2],src='https://mp-eeab6da6-80cd-4e80-844a-66b2a7203834.cdn.bspapp.com/cloudstorage/5d175218-1f6a-41ff-9e6b-7247304dfb05.glb'" size="mini">头盔</button>
@@ -38,27 +44,41 @@
                 <button @click="environmentSrc='https://mp-eeab6da6-80cd-4e80-844a-66b2a7203834.cdn.bspapp.com/cloudstorage/4339b8c6-481b-48f9-bc62-3b12cb7194d4.hdr'" size="mini">环境三</button>
                 <button @click="environmentSrc='https://mp-eeab6da6-80cd-4e80-844a-66b2a7203834.cdn.bspapp.com/cloudstorage/2edfd004-f4d2-45f1-8dac-3be1096bd0ce.hdr'" size="mini">环境四</button>
             </view>
+			<view>动作切换</view>
+			<view class="btnBox">
+			    <button @click="actionChange(1,2)" size="mini">动作切换0-1</button>
+				<button @click="actionChange(2,3)" size="mini">动作切换1-2</button>
+				<button @click="actionChange(3,1)" size="mini">动作切换2-3</button>
+			</view>
          </view>
     </view>
 </template>
 
 <script>
-
     export default {
         data() {
             return {
                 height: '1000rpx',
                 autoRotate:false,
                 decoderPath:'https://cloud.vuedata.wang/draco/',
-                modelScale:[0.3,0.3,0.3],
-                src:'/static/model/dog.glb',
-                environmentSrc:'https://mp-eeab6da6-80cd-4e80-844a-66b2a7203834.cdn.bspapp.com/cloudstorage/b45a40ff-e04f-43d7-afea-399e398ee35a.hdr'
+                modelScale:[0.2,0.2,0.2],
+                src:'/static/model/smal_walk_blender.glb',
+                environmentSrc:'/static/model/white.hdr',
+				modelRotate:[0,0,0],
+				modelPosition:[0,0.1,0],
+				actionNumber:0
             }
         },
         methods: {
             onLoaded() {
                 console.log('模型加载完成');
-            }
+            },
+			actionChange(parameter1,parameter2){
+				 this.$refs.modelRef.playActions(parameter1,parameter2)
+			},
+			selectAction(p){
+				this.actionNumber=p
+			}
         },
         onUnload() {
             this.$refs.modelRef.call('dispose')
