@@ -23,12 +23,16 @@ let idleAction, walkAction, runAction;
 let idleWeight, walkWeight, runWeight;
 let actions, settings;
 let singleStepMode = false;
-let particleLight;
+let particleLight,sphere;
+
 export default {
 	data() {
 		return {
 			pdata: {},
 			theta: 0,
+			currentAction:0,
+			lastAction:0,
+			speed:[0.006,0.003,0.001]
 		}
 	},
 	methods: {
@@ -43,14 +47,6 @@ export default {
 			// 计算一个层级模型对应包围盒的几何体中心在世界坐标中的位置
 			let center = new THREE.Vector3()
 			box3.getCenter(center)
-			// console.log('查看几何体中心坐标', center);
-			// 重新设置模型的位置，使之居中。
-			// group.position.x = group.position.x - center.x
-			// group.position.y = group.position.y - center.y
-			// group.position.z = group.position.z - center.z
-			// group.position.x = 0
-			// group.position.y = 0
-			// group.position.z = 0
 		},
 		async init(val, oldValue, vm) {
 			let data;
@@ -66,12 +62,11 @@ export default {
 				setTimeout(() => { //让步主线程
 					const container = document.getElementById(data.myCanvasId)
 					// this.container = container
-					camera = new THREE.PerspectiveCamera(45, container.offsetWidth / container.offsetHeight,
+					camera = new THREE.PerspectiveCamera(60, container.offsetWidth / container.offsetHeight,
 						0.1, 400);
-					camera.position.set(0, 1, 1);
+					camera.position.set(0.5, 1.5, 1.5);
 					// camera.rotation.y = 3.14;
 					// camera.position.set(0.0, 400, 400 * 3.5);
-
 					renderer = new THREE.WebGLRenderer({
 						alpha: true,
 						antialias: true, // 抗锯齿
@@ -90,22 +85,19 @@ export default {
 					//画布？
 					container.appendChild(renderer.domElement);
 					controls = new OrbitControls(camera, renderer.domElement);
-					// controls.minPolarAngle = Math.PI / 2; //默认值0
-					// controls.maxPolarAngle = Math.PI / 2; //默认值Math.PI
+					// controls.minPolarAngle = Math.PI / 6; //默认值0
+					// controls.maxPolarAngle = Math.PI / 2.5; //默认值Math.PI
 					controls.enableDamping = true;
-
 					//禁止缩放
-					// controls.minDistance = 1;
-					// controls.maxDistance = 100;
+					// controls.minDistance = 2.2;
+					// controls.maxDistance = 3;
 					//禁止拖拽
 					controls.enablePan = false;
 					controls.autoRotate = data.autoRotate; //场景自动旋转
-					controls.target.set(0, 0.1, 0);
+					controls.target.set(0, 0.5, 0);
 					controls.update();
 					this.onWindowResize()
-
 				}, 20);
-
 			} else {
 				this.onWindowResize()
 			}
@@ -136,11 +128,10 @@ export default {
 		},
 		light() {
 			//可以添加点光源到物体上，然后控制物体移动，就可以制造太阳
-
 			//环境光没有方向均匀的照在物体上
-			scene.add(new THREE.AmbientLight(0xffffff, 1));
-			const dirLight = new THREE.DirectionalLight(0xffffff, 3);
-			dirLight.position.set(10, 10, -10);
+			scene.add(new THREE.AmbientLight(0xffffff, 20));
+			const dirLight = new THREE.DirectionalLight(0xffffff, 40);
+			dirLight.position.set(5, 15, 15);
 			dirLight.castShadow = true;
 			dirLight.shadow.camera.top = 2;
 			dirLight.shadow.camera.bottom = -2;
@@ -149,31 +140,72 @@ export default {
 			dirLight.shadow.camera.near = 0.1;
 			dirLight.shadow.camera.far = 40;
 			scene.add(dirLight);
-
 			// const pointLight = new THREE.PointLight(0xffffff, 5, 800, 0);
 			// pointLight.castShadow = true;
 			// pointLight.position.set(0, 400, 0);
 			// scene.add(pointLight)
-
 			// scene.add(particleLight);
-
 			// Lights
-
-			scene.add(new THREE.AmbientLight(0xc1c1c1, 3));
-
-
-
+			// scene.add(new THREE.AmbientLight(0xc1c1c1, 3));
 		},
 		async loadEnvironment() {
 			let data = this.pdata
 			if (data.environmentSrc) {
 				new RGBELoader().load(await getfile(data.environmentSrc), async (texture) => {
 					texture.mapping = THREE.EquirectangularReflectionMapping;
-					scene.background = texture;
-					scene.environment = texture;
-					// scene.background = new THREE.Color(0x444488);
+					// scene.background = texture;
+					// scene.environment = texture;
+					// scene.background = new THREE.Color(0xffffff);
 				});
 			}
+		},
+		async  loadMultipleModels(dataArray, scene, renderer) {
+		    const loader = new GLTFLoader();
+		    if (dataArray.some(data => data.useDracoCompression)) {
+		        // 假设您有一个字段来确定是否使用Draco压缩
+		        loader.setDRACOLoader(new DRACOLoader().setDecoderPath(dataArray[0].decoderPath));
+		    }
+		    const promises = dataArray.map(async (data, index) => {
+		        const file = await getfile(data.src);
+		        return new Promise((resolve, reject) => {
+		            loader.load(
+		                file,
+		                (gltf) => {
+		                    const model = gltf.scene;
+		                    scene.add(model);
+		
+		                    // 为每个模型设置不同的OutlineEffect，或者根据需要共享
+		                    let effect = null;
+		                    if (index === 0) { // 假设只为第一个模型设置轮廓效果
+		                        effect = new OutlineEffect(renderer, {
+		                            defaultThickness: 0.015,
+		                            defaultColor: [0.0, 0.0, 0],
+		                            defaultAlpha: 0.9,
+		                        });
+		                    }
+		
+		                    // 调用某个方法通知模型加载完成
+		                    this.$ownerInstance.callMethod('receiveRenderData', {
+		                        name: 'loaded',
+		                        modelIndex: index // 可以传递模型的索引或标识
+		                    });
+		
+		                    this.animate(); // 如果需要为每个模型调用animate，请确保逻辑正确
+		                    resolve(model); // 解析Promise，以便在外部知道模型何时加载完成
+		                },
+		                (xhr) => {
+		                    console.log((xhr.loaded / xhr.total * 100) + '% loaded'); // 可选的加载进度回调
+		                },
+		                (error) => {
+		                    console.error('An error happened', error);
+		                    reject(error); // 拒绝Promise，以处理加载错误
+		                }
+		            );
+		        });
+		    });
+		    // 等待所有模型加载完成
+		    await Promise.all(promises);
+		    // 所有模型加载完成后可以执行的代码
 		},
 		async loadModel() {
 			let data = this.pdata
@@ -188,30 +220,28 @@ export default {
 							model.rotateX(data.modelRotate[0])
 							model.rotateY(data.modelRotate[1])
 							model.rotateZ(data.modelRotate[2])
-							model.translateX(0.5)
+							// model.translateX(0.5)
 							data.isCenter ? this.center(model) : model.position.set(...data
 								.modelPosition)
 							this.createPanel()
-							//获取动画
+							// //获取动画
 							animations = gltf.animations;
 							mixer = new THREE.AnimationMixer(model);
-							// console.log('gltf.scene',JSON.stringify(gltf.scene) ); // 输出场景对象
-							// console.log('gltf.scenes',JSON.stringify(gltf.scene)); // 输出所有场景对象（如果有多个的话）
-							// console.log('gltf.scene.nodes', JSON.stringify(gltf.scene.nodes, null, 2));
-							// console.log(gltf.materials);
-							// idleAction = mixer.clipAction(animations[0]);
-							// walkAction = mixer.clipAction(animations[1]);
-							// runAction = mixer.clipAction(animations[2]);
+							console.log(gltf.materials);
+							idleAction = mixer.clipAction(animations[0]);
+							walkAction = mixer.clipAction(animations[1]);
+							// console.log('name1',animations[0].name)
+							// console.log('name1',animations[1].name)
+							runAction = mixer.clipAction(animations[2]);
 							// four = mixer.clipAction(animations[3]);
 							// five = mixer.clipAction(animations[4]);
-							// actions = [idleAction, walkAction, runAction];
+							actions = [idleAction, walkAction,runAction];
 							// if (data.autoPlay) {
 							// 	// for (let s of gltf.animations) {
 							// if (animations.length > 0) 
-							// 		five.play();
-
-							// 	// }
-							console.log('animations', animations.length)
+									// idleAction.play()
+							// }
+							// console.log('animations', animations.length)
 							// }
 							// const meterial = new THREE.MeshStandardMaterial();
 							// const planeGeometry = new THREE.PlaneGeometry(10, 10)
@@ -220,16 +250,24 @@ export default {
 							// plane.rotation.x = -Math.PI / 2
 							// plane.receiveShadow = true
 							// scene.add(plane);
-
+							const alexhelper = new THREE.AxesHelper(5)
+							scene.add(alexhelper)
+							
+							const sphereGeometry = new THREE.SphereGeometry(0.1, 32, 32); // 半径为0.1，经度32，纬度32
+							const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 }); // 绿色材质
+							 sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+							sphere.position.set(-1, 0.2, 0.2);
+							
+							// 将球体添加到场景中
+							scene.add(sphere);
 							const mesh = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE
-								.MeshPhongMaterial({
-									color: 0xcbcbcb,
-									depthWrite: false
+								.ShadowMaterial({
+									color: 0xffffff,
+									opacity: 1
 								}));
 							mesh.rotation.x = -Math.PI / 2;
 							mesh.receiveShadow = true;
 							scene.add(mesh);
-
 
 							const colors = new Uint8Array(2);
 							for (let c = 0; c < colors.length; c++) {
@@ -238,32 +276,35 @@ export default {
 							const gradientMap = new THREE.DataTexture(colors, colors.length, 1,
 								THREE.RedFormat);
 							gradientMap.needsUpdate = true;
+							let index = 0
+
 							model.traverse(function(object) {
-								console.log('object',JSON.stringify(object))
+								index++
+								let color=0x875e4c
 								
 								if (object.isMesh) {
-									// console.log('有一个mesh', object.name)
-									
+									// console.log("name", object.name)
 									let whiteMaterial = new THREE.MeshToonMaterial({
-										color: 0xc6cea2,
-										gradientMap: gradientMap,
-										
+										 color: color,
+										 gradientMap: gradientMap,
 									});
-								
 									object.castShadow = true;
-									// object.material = whiteMaterial;
+									object.material = whiteMaterial;
+									color=0xffffff
 								}
-
-								// const material = object.material;
+								const material = object.material;
 								// if (material && (material.isMeshStandardMaterial || material.isMeshPhongMaterial)) {
 								// 	material.flatShading = false; // 确保启用平滑着色
 								// 	console.log('开启平滑着色')
 								// }
 							});
-
 							scene.add(model);
-							// this.activateAllActions();
-							effect = new OutlineEffect(renderer);
+							this.activateAllActions();
+							effect = new OutlineEffect(renderer, {
+								defaultThickness: 0.005, //线条粗细
+								defaultColor: [0.0, 0.0, 0], //线条颜色
+								efaultAlpha: 0.9,
+							});
 							this.$ownerInstance.callMethod('receiveRenderData', {
 								name: 'loaded'
 							})
@@ -280,24 +321,7 @@ export default {
 		},
 		createPanel() {
 			settings = {
-				'show model': true,
-				'show skeleton': false,
-				'modify step size': 0.05,
-				'from walk to idle': function() {
-					this.prepareCrossFade(walkAction, idleAction, 1.0);
-				},
-				'from idle to walk': function() {
-					this.prepareCrossFade(idleAction, walkAction, 0.5);
-				},
-				'from walk to run': function() {
-					this.prepareCrossFade(walkAction, runAction, 2.5);
-				},
-				'from run to walk': function() {
-					this.prepareCrossFade(runAction, walkAction, 5.0);
-				},
-				'use default duration': true,
-				'set custom duration': 3.5,
-				'modify idle weight': 1.0,
+				'modify idle weight': 0.0,
 				'modify walk weight': 0.0,
 				'modify run weight': 0.0,
 				'modify time scale': 1.0
@@ -308,10 +332,11 @@ export default {
 				p1,
 				p2
 			} = val
-
 			if (p1) {
 				console.log('p1 p2', p1, p2)
-				this.prepareCrossFade(actions[p1 - 1], actions[p2 - 1], 5.5);
+				this.lastAction=this.currentAction
+				this.prepareCrossFade(actions[this.currentAction], actions[p2 - 1], 5.5);
+				this.currentAction=p2-1
 				// idleAction.crossFadeTo(walkAction, 5.0, true);
 			}
 		},
@@ -331,7 +356,6 @@ export default {
 			actions.forEach(function(action) {
 				action.paused = false;
 			});
-
 		},
 		synchronizeCrossFade(startAction, endAction, duration) {
 			mixer.addEventListener('loop', onLoopFinished);
@@ -361,13 +385,10 @@ export default {
 		activateAllActions() {
 			this.setWeight(idleAction, settings['modify idle weight']);
 			this.setWeight(walkAction, settings['modify walk weight']);
-			this.setWeight(runAction, settings['modify run weight']);
-
+			// this.setWeight(runAction, settings['modify run weight']);
 			actions.forEach(function(action) {
 				action.play();
-
 			});
-
 		},
 		setWeight(action, weight) {
 			action.enabled = true;
@@ -382,21 +403,19 @@ export default {
 		},
 		animate() {
 			this.animationID = requestAnimationFrame(this.animate);
-
-			//3渲2的灯光位置变换
-			// const timer = Date.now() * 0.00025;
-
-			// particleLight.position.x = Math.sin(timer * 7) * 300;
-			// particleLight.position.y = Math.cos(timer * 5) * 400;
-			// particleLight.position.z = Math.cos(timer * 3) * 300;
+			// const weight0 = actions[0].getEffectiveWeight();
+			// const weight1 = actions[1].getEffectiveWeight();
+			// const weight2 = actions[2].getEffectiveWeight();
+			// console.log('idleAction', weight0);
+			// console.log('walkAction', weight1);
+			// console.log('runAction', weight2);
+			// console.log('this.lastAction',this.lastAction,this.currentAction)
+			// let speed=actions[this.lastAction].getEffectiveWeight()*this.speed[this.lastAction]+actions[this.currentAction].getEffectiveWeight()*this.speed[this.currentAction];
+			// sphere.position.x += speed;
+			// if(sphere.position.x>1)
+			// 	sphere.position.x=-1
 			if (mixer)
 				mixer.update(clock.getDelta());
-			// this.theta+=0.02
-			// if(this.theta>3.12)
-			// 	this.theta=0
-			// camera.position.set(5 * Math.sin(this.theta), 0, 5 * Math.cos(this.theta));
-			// console.log('theta', this.theta)
-			// camera.rotation.y += 0.02;
 			controls.update(); // required if damping enabled
 			// this.render();
 			effect.render(scene, camera);
@@ -405,7 +424,6 @@ export default {
 			renderer.render(scene, camera);
 		},
 		async callPlayer(val) {
-
 			if (!val.name) return;
 			let {
 				name,

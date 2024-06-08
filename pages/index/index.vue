@@ -61,11 +61,11 @@
                 height: '1000rpx',
                 autoRotate:false,
                 decoderPath:'https://cloud.vuedata.wang/draco/',
-                modelScale:[0.2,0.2,0.2],
-                src:'/static/model/smal_walk_blender.glb',
+                modelScale:[0.4,0.4,0.4],
+                src:'/static/model/28.glb',
                 environmentSrc:'/static/model/white.hdr',
-				modelRotate:[0,0,0],
-				modelPosition:[0,0.1,0],
+				modelRotate:[-Math.PI/2,0,-Math.PI/2],
+				modelPosition:[0,0.3,0],
 				actionNumber:0
             }
         },
